@@ -784,7 +784,7 @@ function generate(lv, st){
   $('#deltaMin').value=delta; $('#dir').value=String(dir);
   refreshQuestion();
   setClock(h0*60+m0,true);        // 時計を基準時こくにセット
-  resetWheels();
+  setWheelVal('wheelH', h0); setWheelVal('wheelM', m0);   // 答えの初期値＝問題の時こく（動かした分が分かる）
   $('#result').innerHTML='';
   $('#hintBox').classList.remove('open');   // ヒントは閉じる
   window.scrollTo({top:0,behavior:'smooth'});
@@ -817,6 +817,7 @@ function commitMake(){
   $('#deltaMin').value=dh*60+dm;
   refreshQuestion();
   setClock(bh*60+bm,true);
+  setWheelVal('wheelH', bh); setWheelVal('wheelM', bm);   // 答えの初期値＝問題の時こく
   $('#result').innerHTML='';
 }
 function enterMake(){
