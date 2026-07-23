@@ -219,6 +219,19 @@
   .lv small{font-size:.6rem;font-weight:700;color:#b3a992;margin-top:1px;}
   .lv.active{background:var(--accent2);color:#fff;border-color:var(--accent2);box-shadow:0 2px 0 #2f6fd0;}
   .lv.active small{color:#eaf2ff;}
+  /* だんかい（2段階）バー */
+  .stagebar{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;margin-bottom:10px;}
+  .stage{
+    border:2px solid #c9ead6;background:#fff;border-radius:12px;
+    padding:6px 14px;font-weight:800;font-size:1.02rem;font-family:inherit;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;line-height:1.1;color:#3a8a5f;
+    box-shadow:0 2px 0 rgba(0,0,0,.06);transition:transform .05s;
+  }
+  .stage:active{transform:translateY(1px);}
+  .stage small{font-size:.62rem;font-weight:700;color:#8bc0a3;margin-top:1px;}
+  .stage.active{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 2px 0 #3fa76a;}
+  .stage.active small{color:#e5fff0;}
+
   .makebtn{
     border:2px solid #ffd9a8;background:#fff;border-radius:12px;
     padding:5px 11px;font-weight:800;font-size:1.1rem;font-family:inherit;cursor:pointer;
@@ -367,6 +380,12 @@
         <button class="lv" data-lv="5">5<small>1分</small></button>
         <button class="makebtn" id="makeBtn">✏️<small>じぶん</small></button>
         <button class="btn newq" id="newQ">🎲 べつのもんだい</button>
+      </div>
+
+      <div class="stagebar" id="stagebar">
+        <span class="lv-label">だんかい</span>
+        <button class="stage" data-st="1">① 分だけ<small>1時間いない</small></button>
+        <button class="stage" data-st="2">② 時間と分<small>◯時間◯分</small></button>
       </div>
 
       <div class="question" id="questionText">…</div>
@@ -707,7 +726,7 @@ function judge(){
   if(ah===c.h && am===c.m){
     box.innerHTML=`<span class="card-msg ok">⭕ せいかい！すごい！<span class="sub">${c.h}時${String(c.m).padStart(2,'0')}分 だね 🎉</span></span>`+
                   `<button class="btn go big nextbtn" id="nextBtn">つぎのもんだい →</button>`;
-    $('#nextBtn').addEventListener('click',()=>generate(currentLevel));
+    $('#nextBtn').addEventListener('click',()=>generate(currentLevel, currentStage));
   }else{
     box.innerHTML=`<span class="card-msg ng">❌ ちがうよ<span class="sub">もう いちど がんばって！</span></span>`;
   }
@@ -716,10 +735,10 @@ function judge(){
 $('#judgeBtn').addEventListener('click',judge);
 
 /* ===== 難易度＆問題ランダム生成 ===== */
-const LV_UNIT    =[60,30,15,5,1];   // delta（すすむ分）の きざみ
-const LV_BASEUNIT=[5, 30,15,5,1];   // もとの時こく（分）の きざみ ← レベル1でも 分をランダムに
-const LV_MAXSTEP =[3, 5, 8, 18,110]; // delta = きざみ × 1..maxstep
+const LV_UNIT    =[30,30,15,5,1];   // delta（すすむ分）の きざみ
+const LV_BASEUNIT=[60,30,15,5,1];   // もとの時こく（分）の きざみ（Lv1=ちょうど＝00分）
 let currentLevel=1;
+let currentStage=1;   // 1=分だけ(1時間いない) / 2=時間と分(◯時間◯分)
 function randInt(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
 function formatDelta(mins){
   const h=Math.floor(mins/60), m=mins%60;
@@ -743,15 +762,28 @@ function setLevel(lv){
   currentLevel=lv;
   document.querySelectorAll('.lv').forEach(b=>b.classList.toggle('active',Number(b.dataset.lv)===lv));
 }
-function generate(lv){
+function setStage(st){
+  currentStage=st;
+  document.querySelectorAll('.stage').forEach(b=>b.classList.toggle('active',Number(b.dataset.st)===st));
+}
+function generate(lv, st){
+  st = st || currentStage;
   setMode('quiz');
   setLevel(lv);
+  setStage(st);
   const unit=LV_UNIT[lv-1], bunit=LV_BASEUNIT[lv-1];
   const h0=randInt(1,12);
-  let mults=[]; for(let x=0;x<60;x+=bunit) mults.push(x);
-  if(lv===1) mults=mults.filter(x=>x!==0);   // 1時間問題は「ちょうど◯時」を避けて 分をランダムに
-  const m0=mults[randInt(0,mults.length-1)];
-  const delta=unit*randInt(1,LV_MAXSTEP[lv-1]);
+  const bmults=[]; for(let x=0;x<60;x+=bunit) bmults.push(x);
+  const m0=bmults[randInt(0,bmults.length-1)];
+  const maxK=Math.floor(59/unit);            // きざみが 60未満に おさまる 最大回数
+  let delta;
+  if(st===1){
+    delta = unit*randInt(1,maxK);            // だんかい①：分だけ（1時間いない）
+  }else{
+    const H=randInt(1,3);                    // だんかい②：◯時間◯分（分は0にしない）
+    const M=unit*randInt(1,maxK);
+    delta = H*60 + M;
+  }
   const dir=Math.random()<0.5?1:-1;
   $('#baseH').value=h0; $('#baseM').value=m0;
   $('#deltaMin').value=delta; $('#dir').value=String(dir);
@@ -763,15 +795,19 @@ function generate(lv){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 document.querySelectorAll('.lv').forEach(b=>{
-  b.addEventListener('click',()=>generate(Number(b.dataset.lv)));
+  b.addEventListener('click',()=>generate(Number(b.dataset.lv), currentStage));
 });
-$('#newQ').addEventListener('click',()=>generate(currentLevel));
+document.querySelectorAll('.stage').forEach(b=>{
+  b.addEventListener('click',()=>generate(currentLevel, Number(b.dataset.st)));
+});
+$('#newQ').addEventListener('click',()=>generate(currentLevel, currentStage));
 
 /* ===== モード切替（レベル出題 ⇔ じぶんでつくる） ===== */
 function setMode(m){
   const make=(m==='make');
   $('#makeBox').style.display=make?'block':'none';
   $('#newQ').style.display=make?'none':'inline-flex';
+  $('#stagebar').style.display=make?'none':'flex';
   $('#makeBtn').classList.toggle('active',make);
   if(make) document.querySelectorAll('.lv').forEach(b=>b.classList.remove('active'));
 }
@@ -976,9 +1012,9 @@ $('#calcMin').addEventListener('click',()=>{
   $('#ansMin').innerHTML=ans;
 });
 
-/* 初期描画：レベルもランダムで さいしょの問題を出す */
+/* 初期描画：レベルはランダム、だんかいは①（やさしい）から */
 render(false);
-generate(randInt(1,5));
+generate(randInt(1,5), 1);
 </script>
 </body>
 </html>
