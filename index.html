@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>とけいのれんしゅう</title>
 <style>
   :root{
@@ -17,7 +17,8 @@
     --shadow:0 6px 18px rgba(0,0,0,.08);
     font-size:16px;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   body{
     margin:0;
     font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN",-apple-system,"Segoe UI",system-ui,sans-serif;
@@ -335,7 +336,7 @@
     <div class="toolbar">
       <label class="toggle"><input type="checkbox" id="digToggle"> デジタルもみる</label>
       <button class="btn set-btn" id="setOpen">⏰ 時こくをセット</button>
-      <button class="btn ghost" id="resetBtn">10:10にもどす</button>
+      <button class="btn ghost" id="resetBtn">🔄 もんだいの時こくにもどす</button>
     </div>
 
     <!-- 時刻セットパネル -->
@@ -580,8 +581,17 @@ const STEPS = [
         <button class="btn pm plus"  aria-label="${s.label}すすめる">＋</button>
         <button class="btn pm minus" aria-label="${s.label}もどす">－</button>
       </div>`;
-    wrap.querySelector('.plus').addEventListener('click',()=>{const b=minRot;addMinutes(s.v);drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999');});
-    wrap.querySelector('.minus').addEventListener('click',()=>{const b=minRot;addMinutes(-s.v);drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999');});
+    wrap.querySelector('.plus').addEventListener('click',()=>{
+      const b=minRot; addMinutes(s.v); drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999',s.v);
+    });
+    wrap.querySelector('.minus').addEventListener('click',()=>{
+      const top=arcStack[arcStack.length-1];
+      if(top && top.v===s.v){           // 直前が同じ大きさの帯 → もとにもどす（帯を消す）
+        addMinutes(-s.v); popArc();
+      }else{                            // それ以外 → 逆むきの帯をつける
+        const b=minRot; addMinutes(-s.v); drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999',s.v);
+      }
+    });
     box.appendChild(wrap);
   });
 })();
@@ -606,7 +616,11 @@ $('#setApply').addEventListener('click',()=>{
   render(true); clearArcs();
   $('#setpanel').classList.remove('open');
 });
-$('#resetBtn').addEventListener('click',()=>{ state.total=10*60+10; render(true); clearArcs(); });
+$('#resetBtn').addEventListener('click',()=>{
+  const bh=clampInt($('#baseH').value,0,23,0);
+  const bm=clampInt($('#baseM').value,0,59,0);
+  setClock(bh*60+bm,true);          // 問題の時こくにもどす（色おびもクリア）
+});
 
 function clampInt(v,min,max,def){
   let n = parseInt(v,10);
@@ -795,38 +809,48 @@ document.querySelectorAll('.dirbtn').forEach(b=>{
 const SVGNS='http://www.w3.org/2000/svg';
 const arcsG=$('#arcs');
 const CHUNK_COLORS={60:'#ef476f',30:'#a855f7',10:'#ff9f1c',5:'#06d6a0',1:'#118ab2'};
-/* 帯は押すたびに 少しずつ 内側にずらす（かさならない・2時間3時間もリングで分かる） */
+/* 帯は押すたびに 少しずつ 内側にずらす（かさならない・2時間3時間もリングで分かる）
+   スタック管理：「＋」で帯を積む／同じ大きさの「－」で 直前の帯を消す（もとにもどす） */
 const R_START=108, R_STEP=15, R_MIN=38;
 let arcR=R_START;
-function clearArcs(){ arcsG.innerHTML=''; arcR=R_START; }
+let arcStack=[];
+function clearArcs(){ arcsG.innerHTML=''; arcR=R_START; arcStack=[]; }
 function nextR(){ const r=arcR; arcR=Math.max(R_MIN, arcR-R_STEP); return r; }
 function polar(angleDeg,r){
   const a=angleDeg*Math.PI/180;
   return [200 + r*Math.sin(a), 200 - r*Math.cos(a)];
 }
-function drawArc(fromA,toA,color){
-  const r=nextR();
+function makeArc(fromA,toA,color,r){
   const span=Math.abs(toA-fromA);
-  if(span>=359.5){
-    // 1時間ぶん＝ぐるっと1しゅう（まるい輪）
-    const c=document.createElementNS(SVGNS,'circle');
-    c.setAttribute('cx',200); c.setAttribute('cy',200); c.setAttribute('r',r);
-    c.setAttribute('fill','none'); c.setAttribute('stroke',color);
-    c.setAttribute('stroke-width','10'); c.setAttribute('opacity','0.85');
-    arcsG.appendChild(c);
-    return;
+  let el;
+  if(span>=359.5){                         // 1時間ぶん＝ぐるっと1しゅう（まるい輪）
+    el=document.createElementNS(SVGNS,'circle');
+    el.setAttribute('cx',200); el.setAttribute('cy',200); el.setAttribute('r',r);
+  }else{
+    const [x1,y1]=polar(fromA,r), [x2,y2]=polar(toA,r);
+    const large=span>180?1:0, sweep=toA>fromA?1:0;
+    el=document.createElementNS(SVGNS,'path');
+    el.setAttribute('d',`M ${x1} ${y1} A ${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`);
+    el.setAttribute('stroke-linecap','round');
   }
-  const [x1,y1]=polar(fromA,r), [x2,y2]=polar(toA,r);
-  const large=span>180?1:0;
-  const sweep=toA>fromA?1:0;
-  const p=document.createElementNS(SVGNS,'path');
-  p.setAttribute('d',`M ${x1} ${y1} A ${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`);
-  p.setAttribute('fill','none');
-  p.setAttribute('stroke',color);
-  p.setAttribute('stroke-width','10');
-  p.setAttribute('stroke-linecap','round');
-  p.setAttribute('opacity','0.85');
-  arcsG.appendChild(p);
+  el.setAttribute('fill','none'); el.setAttribute('stroke',color);
+  el.setAttribute('stroke-width','10'); el.setAttribute('opacity','0.85');
+  return el;
+}
+/* 帯を積む（v = 大きさ。あとで「－」の判定に使う） */
+function drawArc(fromA,toA,color,v){
+  const r=nextR();
+  const el=makeArc(fromA,toA,color,r);
+  arcsG.appendChild(el);
+  arcStack.push({v, el, r});
+}
+/* 直前の帯を消す（もとにもどす） */
+function popArc(){
+  if(!arcStack.length) return false;
+  const e=arcStack.pop();
+  e.el.remove();
+  arcR=e.r;                                 // ずらした半径ももどす
+  return true;
 }
 
 /* 絶対時刻セット（色おびもクリア） */
@@ -869,7 +893,7 @@ $('#hintBtn').addEventListener('click',()=>{
       if(b.classList.contains('used')) return;
       const before=minRot;
       addMinutes(dir*p);
-      drawArc(before, minRot, CHUNK_COLORS[p]);
+      drawArc(before, minRot, CHUNK_COLORS[p], p);
       b.classList.add('used');
       window.scrollTo({top:0,behavior:'smooth'});
       // 進んだ分チップ
