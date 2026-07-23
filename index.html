@@ -352,11 +352,11 @@
       <button class="btn ghost" id="resetBtn">🔄 もんだいの時こくにもどす</button>
     </div>
 
-    <!-- 時刻セットパネル -->
+    <!-- 時刻セットパネル（ホイールで えらぶ） -->
     <div class="setpanel" id="setpanel">
-      <input class="numin" id="setH" type="number" min="0" max="23" value="10" inputmode="numeric">
+      <div class="wheelwrap sm"><div class="wheel sm" id="setH"></div><div class="band"></div></div>
       <span class="sep">時</span>
-      <input class="numin" id="setM" type="number" min="0" max="59" value="10" inputmode="numeric">
+      <div class="wheelwrap sm"><div class="wheel sm" id="setM"></div><div class="band"></div></div>
       <span class="sep">分</span>
       <button class="btn set-btn" id="setApply">セット</button>
     </div>
@@ -444,11 +444,6 @@
           <span id="progressTotal" class="ptotal"></span>
         </div>
         <button class="btn ghost small" id="hintReset">↺ もういちど</button>
-      </div>
-
-      <div class="qline" style="margin-top:10px;">
-        <button class="btn ghost" id="showOnClock">🕐 じどうで うごかす</button>
-        <span class="hint">基準にセットしてから、ゆっくり針がうごきます</span>
       </div>
     </div>
 
@@ -629,14 +624,13 @@ $('#digToggle').addEventListener('change',e=>{
 $('#setOpen').addEventListener('click',()=>{
   const p=$('#setpanel'); p.classList.toggle('open');
   if(p.classList.contains('open')){
-    $('#setH').value = Math.floor(state.total/60);
-    $('#setM').value = state.total%60;
+    let h=Math.floor(state.total/60)%12; if(h===0) h=12;   // 1〜12時 表記でホイールに
+    requestAnimationFrame(()=>{ setWheelVal('setH',h); setWheelVal('setM',state.total%60); });
   }
 });
 $('#setApply').addEventListener('click',()=>{
-  let h = clampInt($('#setH').value,0,23,10);
-  let m = clampInt($('#setM').value,0,59,0);
-  state.total = h*60+m;
+  const h=wheelVal('setH'), m=wheelVal('setM');   // h は 1〜12
+  state.total = (h%12)*60 + m;
   render(true); clearArcs();
   $('#setpanel').classList.remove('open');
 });
@@ -706,6 +700,9 @@ buildWheel('mkH',[1,2,3,4,5,6,7,8,9,10,11,12]);
 buildWheel('mkM',Array.from({length:60},(_,i)=>i));
 buildWheel('mkDH',Array.from({length:13},(_,i)=>i)); // 0〜12時間
 buildWheel('mkDM',Array.from({length:60},(_,i)=>i)); // 0〜59分
+/* 時こくをセット 用ホイール */
+buildWheel('setH',[1,2,3,4,5,6,7,8,9,10,11,12]);
+buildWheel('setM',Array.from({length:60},(_,i)=>i));
 
 /* アナログ時計の見た目（1〜12時）に合わせた読み */
 function to12(total){
@@ -974,26 +971,6 @@ $('#hintReset').addEventListener('click',()=>{
   $('#progressChips').innerHTML='';
   $('#progressTotal').textContent='';
   const old=$('#hintBox').querySelector('.done-msg'); if(old) old.remove();
-});
-
-/* 時計でうごかしてみる：基準にセット→少し待って結果へ */
-$('#showOnClock').addEventListener('click',()=>{
-  const bh=clampInt($('#baseH').value,0,23,0);
-  const bm=clampInt($('#baseM').value,0,59,0);
-  const d =clampInt($('#deltaMin').value,0,1440,0);
-  const dir=parseInt($('#dir').value,10);
-  // まず基準にセット（アニメなし）
-  state.total=bh*60+bm; render(false); clearArcs();
-  window.scrollTo({top:0,behavior:'smooth'});
-  // 少しずつ動かす
-  let remain=d;
-  const stepSize = d>180? 30 : (d>60?10:5);
-  const timer=setInterval(()=>{
-    const step=Math.min(stepSize,remain);
-    addMinutes(dir*step);
-    remain-=step;
-    if(remain<=0) clearInterval(timer);
-  },650);
 });
 
 /* ========== 時間→日にち／分→時間 ========== */
