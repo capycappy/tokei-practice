@@ -195,6 +195,56 @@
   .ptotal{font-weight:800;color:var(--accent);font-size:1.2rem;margin-left:4px;}
   .done-msg{font-size:1.3rem;font-weight:800;color:var(--green);margin-top:4px;}
 
+  /* ===== レイアウト：ワイド画面は時計を左に固定（ヒントで隠れない） ===== */
+  .layout{display:grid;gap:18px;grid-template-columns:1fr;}
+  @media(min-width:920px){
+    .wrap{max-width:1160px;}
+    .layout{grid-template-columns:420px 1fr;align-items:start;}
+    .clock-card{position:sticky;top:14px;}
+    .clock-row{flex-direction:column;}
+    .steppers{margin-top:4px;}
+  }
+
+  /* ===== こたえは？ ホイール入力 ===== */
+  .answerbox{
+    margin-top:14px;padding:14px 16px;border-radius:16px;
+    background:#eef6ff;border:2px solid #cfe3ff;
+  }
+  .ab-label{font-size:1.15rem;font-weight:800;color:#2f6fd0;margin-bottom:10px;}
+  .wheels{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .wsep{font-size:1.5rem;font-weight:800;}
+  .wheelwrap{position:relative;width:96px;height:132px;}
+  .wheel{
+    width:96px;height:132px;overflow-y:scroll;scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch;border:3px solid #cfe3ff;border-radius:16px;
+    background:#fff;scrollbar-width:none;text-align:center;
+  }
+  .wheel::-webkit-scrollbar{display:none;}
+  .wspacer{height:44px;}
+  .witem{
+    height:44px;line-height:44px;scroll-snap-align:center;
+    font-size:1.7rem;font-weight:800;color:#c3cfe0;cursor:pointer;
+    font-variant-numeric:tabular-nums;transition:color .12s,transform .12s;
+  }
+  .witem.sel{color:var(--accent2);transform:scale(1.15);}
+  .band{
+    position:absolute;left:0;right:0;top:44px;height:44px;pointer-events:none;
+    border-top:2px solid var(--accent2);border-bottom:2px solid var(--accent2);
+    background:rgba(77,150,255,.08);border-radius:4px;
+  }
+  .go.big{padding:14px 22px;font-size:1.2rem;align-self:center;}
+
+  /* ===== 正誤フィードバック ===== */
+  .result{margin-top:12px;min-height:1.2em;}
+  .result .card-msg{
+    display:inline-block;padding:12px 20px;border-radius:16px;
+    font-size:1.5rem;font-weight:800;animation:pop .35s cubic-bezier(.34,1.4,.5,1);
+  }
+  .result .ok{background:#e3f9ec;color:#1f9d57;border:2px solid #86e0ac;}
+  .result .ng{background:#ffeceb;color:#e14b3b;border:2px solid #ffb3ac;}
+  .result .sub{display:block;font-size:1rem;margin-top:2px;font-weight:700;}
+  @keyframes pop{0%{transform:scale(.6);opacity:0;}100%{transform:scale(1);opacity:1;}}
+
   .foot{text-align:center;color:#b3a992;font-size:.8rem;margin:10px 0 30px;}
 </style>
 </head>
@@ -202,8 +252,9 @@
 <div class="wrap">
   <h1>🕐 とけいのれんしゅう</h1>
 
+  <div class="layout">
   <!-- ============ 時計カード ============ -->
-  <div class="card">
+  <div class="card clock-card">
     <div class="clock-row">
       <!-- アナログ時計 -->
       <div class="clock-box">
@@ -273,9 +324,21 @@
           <option value="-1">まえ（前）は？</option>
         </select>
         <button class="btn hintbtn" id="hintBtn">💡 ヒント</button>
-        <button class="btn go" id="calcAfter">こたえる</button>
+        <button class="btn go" id="judgeTop">こたえる</button>
       </div>
-      <div class="answer" id="ansAfter"></div>
+
+      <!-- こたえは？ ホイールで入力 -->
+      <div class="answerbox">
+        <div class="ab-label">✏️ こたえは？　<span class="hint">数字を くるくる回して あわせてね</span></div>
+        <div class="wheels">
+          <div class="wheelwrap"><div class="wheel" id="wheelH"></div><div class="band"></div></div>
+          <span class="wsep">時</span>
+          <div class="wheelwrap"><div class="wheel" id="wheelM"></div><div class="band"></div></div>
+          <span class="wsep">分</span>
+          <button class="btn go big" id="judgeBtn">こたえあわせ</button>
+        </div>
+        <div class="result" id="result"></div>
+      </div>
 
       <!-- ヒント：分解ボタン＋色おび -->
       <div class="hintbox" id="hintBox">
@@ -312,6 +375,7 @@
       <div class="answer" id="ansMin"></div>
     </div>
   </div>
+  </div><!-- /layout -->
 
   <div class="foot">つくった時計はブラウザだけで うごきます · インターネットがなくても OK</div>
 </div>
@@ -493,21 +557,56 @@ function fmtTime(total){
   const ampm = h<12?'午前':'午後'; let h12=h%12; if(h12===0)h12=12;
   return {text:`${h}時${String(m).padStart(2,'0')}分`, nice:`${ampm} ${h12}:${String(m).padStart(2,'0')}`, h, m, total};
 }
-let lastResult = null;
-$('#calcAfter').addEventListener('click',()=>{
+/* ===== ホイール（くるくる数字えらび） ===== */
+const ROWH=44;
+function buildWheel(id,count){
+  const el=$('#'+id);
+  el.innerHTML='<div class="wspacer"></div>';
+  for(let i=0;i<count;i++){
+    const d=document.createElement('div');
+    d.className='witem'; d.textContent=i; d.dataset.i=i;
+    d.addEventListener('click',()=>el.scrollTo({top:i*ROWH,behavior:'smooth'}));
+    el.appendChild(d);
+  }
+  const sp=document.createElement('div'); sp.className='wspacer'; el.appendChild(sp);
+  const mark=()=>{
+    const idx=Math.round(el.scrollTop/ROWH);
+    el.querySelectorAll('.witem').forEach(w=>w.classList.toggle('sel',Number(w.dataset.i)===idx));
+  };
+  el.addEventListener('scroll',()=>{ clearTimeout(el._t); el._t=setTimeout(mark,60); mark(); });
+  mark();
+}
+function wheelVal(id,count){
+  const el=$('#'+id);
+  return Math.max(0,Math.min(count-1,Math.round(el.scrollTop/ROWH)));
+}
+function setWheel(id,v){ $('#'+id).scrollTop=v*ROWH; }
+buildWheel('wheelH',24);
+buildWheel('wheelM',60);
+
+/* ===== こたえあわせ（正誤判定） ===== */
+function judge(){
   const bh=clampInt($('#baseH').value,0,23,0);
   const bm=clampInt($('#baseM').value,0,59,0);
   const d =clampInt($('#deltaMin').value,0,1440,0);
   const dir=parseInt($('#dir').value,10);
-  const base=bh*60+bm;
-  const res=base + dir*d;
-  const r=fmtTime(res);
-  const word = dir>0?'あと':'まえ';
-  let dayNote='';
-  if(res>=1440) dayNote=' <span class="hint">（つぎの日）</span>';
-  if(res<0)     dayNote=' <span class="hint">（まえの日）</span>';
-  $('#ansAfter').innerHTML = `${bh}時${String(bm).padStart(2,'0')}分 の ${d}分${word} は …　<span class="big">${r.text}</span>${dayNote}`;
-  lastResult = {base, res};
+  const r=fmtTime(bh*60+bm + dir*d);          // 正解（0〜23時 表記）
+  const ah=wheelVal('wheelH',24), am=wheelVal('wheelM',60);
+  const box=$('#result');
+  if(ah===r.h && am===r.m){
+    box.innerHTML=`<span class="card-msg ok">⭕ せいかい！すごい！<span class="sub">${r.h}時${String(r.m).padStart(2,'0')}分 だね 🎉</span></span>`;
+  }else{
+    box.innerHTML=`<span class="card-msg ng">❌ ちがうよ<span class="sub">もう いちど がんばって！</span></span>`;
+  }
+  box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+$('#judgeBtn').addEventListener('click',judge);
+$('#judgeTop').addEventListener('click',judge);
+
+/* 問題の条件をいじったら 前の判定は消す */
+['#baseH','#baseM','#deltaMin','#dir'].forEach(sel=>{
+  $(sel).addEventListener('input',()=>{ $('#result').innerHTML=''; });
+  $(sel).addEventListener('change',()=>{ $('#result').innerHTML=''; });
 });
 
 /* ========== 色おび（動いた分の可視化） ========== */
@@ -596,14 +695,12 @@ $('#hintBtn').addEventListener('click',()=>{
       const used=usedBtns.length;
       $('#progressTotal').textContent = '＝ '+sum+'分';
       if(used===parts.length){
-        const h=Math.floor(state.total/60), m=state.total%60;
-        let msg=$('#progressTotal');
-        const done=document.createElement('div');
-        done.className='done-msg';
-        done.textContent=`🎉 こたえは ${h}時${String(m).padStart(2,'0')}分！`;
-        // 既存のdone-msgを消してから追加
+        // 答えは出さない。時計を見て自分で「こたえは？」に入力してね
         const old=$('#hintBox').querySelector('.done-msg');
         if(old) old.remove();
+        const done=document.createElement('div');
+        done.className='done-msg';
+        done.textContent=`✨ ${sum}分 ぜんぶ うごかせたね！時計を見て こたえてみよう`;
         $('#progressChips').parentElement.appendChild(done);
       }
     });
