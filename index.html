@@ -167,6 +167,34 @@
   .tab.active{background:var(--card);color:var(--accent2);box-shadow:0 -3px 8px rgba(0,0,0,.05);}
   .panel{display:none;}
   .panel.active{display:block;}
+  .setmini{background:var(--accent2);color:#fff;padding:8px 14px;font-size:1rem;}
+  .hintbtn{background:var(--yellow);color:#7a5a00;padding:8px 16px;font-size:1.05rem;}
+  .btn.small{padding:6px 12px;font-size:.9rem;}
+
+  /* ヒントボックス */
+  .hintbox{
+    display:none;
+    margin-top:12px;padding:14px;border-radius:16px;
+    background:#fbf6ec;border:2px dashed #e2d6bd;
+  }
+  .hintbox.open{display:block;}
+  .hint-title{font-size:1.15rem;font-weight:800;margin-bottom:10px;color:#6b6255;}
+  .hint-title b{color:var(--accent2);font-size:1.3rem;}
+  .chunkrow{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+  .chunk{
+    color:#fff;font-size:1.25rem;font-weight:800;
+    padding:12px 20px;border-radius:16px;min-width:74px;
+    display:inline-flex;align-items:center;gap:6px;justify-content:center;
+  }
+  .chunk .num{font-size:1.35rem;}
+  .chunk.used{opacity:.45;filter:grayscale(.3);}
+  .chunk.used::after{content:"✓";font-size:1.1rem;margin-left:2px;}
+  .progressline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:1.8em;margin-bottom:8px;}
+  #progressChips{display:inline-flex;gap:6px;flex-wrap:wrap;}
+  .pchip{color:#fff;font-weight:800;border-radius:8px;padding:2px 10px;font-size:1rem;}
+  .ptotal{font-weight:800;color:var(--accent);font-size:1.2rem;margin-left:4px;}
+  .done-msg{font-size:1.3rem;font-weight:800;color:var(--green);margin-top:4px;}
+
   .foot{text-align:center;color:#b3a992;font-size:.8rem;margin:10px 0 30px;}
 </style>
 </head>
@@ -184,6 +212,8 @@
           <circle cx="200" cy="200" r="188" fill="#fffdf8" stroke="#f2ece0" stroke-width="2"/>
           <g id="ticks"></g>
           <g id="numbers"></g>
+          <!-- 動いた分の色おび -->
+          <g id="arcs"></g>
           <!-- 針 -->
           <line id="hourHand"  x1="200" y1="200" x2="200" y2="118" stroke="var(--accent2)" stroke-width="12" stroke-linecap="round"/>
           <line id="minHand"   x1="200" y1="200" x2="200" y2="60"  stroke="var(--accent)"  stroke-width="8"  stroke-linecap="round"/>
@@ -232,7 +262,9 @@
           <input class="miniin" id="baseH" type="number" min="0" max="23" value="3" inputmode="numeric">時
           <input class="miniin" id="baseM" type="number" min="0" max="59" value="20" inputmode="numeric">分
         </span>
-        の
+        <button class="btn setmini" id="baseSet">⏰ この時こくにセット</button>
+      </div>
+      <div class="qline" style="margin-top:8px;">
         <span class="chip">
           <input class="miniin" id="deltaMin" type="number" min="0" max="1440" value="45" inputmode="numeric">分
         </span>
@@ -240,12 +272,26 @@
           <option value="1">あと（後）は？</option>
           <option value="-1">まえ（前）は？</option>
         </select>
+        <button class="btn hintbtn" id="hintBtn">💡 ヒント</button>
         <button class="btn go" id="calcAfter">こたえる</button>
       </div>
       <div class="answer" id="ansAfter"></div>
-      <div class="qline" style="margin-top:6px;">
-        <button class="btn ghost" id="showOnClock">🕐 上の時計でうごかしてみる</button>
-        <span class="hint">まず基準の時こくにセットしてから、ゆっくり針がうごきます</span>
+
+      <!-- ヒント：分解ボタン＋色おび -->
+      <div class="hintbox" id="hintBox">
+        <div class="hint-title" id="hintTitle"></div>
+        <div class="chunkrow" id="chunkRow"></div>
+        <div class="progressline">
+          <span class="hint">うごいた分：</span>
+          <span id="progressChips"></span>
+          <span id="progressTotal" class="ptotal"></span>
+        </div>
+        <button class="btn ghost small" id="hintReset">↺ もういちど</button>
+      </div>
+
+      <div class="qline" style="margin-top:10px;">
+        <button class="btn ghost" id="showOnClock">🕐 じどうで うごかす</button>
+        <span class="hint">基準にセットしてから、ゆっくり針がうごきます</span>
       </div>
     </div>
 
@@ -379,6 +425,7 @@ function addMinutes(delta){
 
 /* 針うごかしボタンを作る（5・10・30分＋1時間、＋／－を縦に） */
 const STEPS = [
+  {label:'1分',  v:1},
   {label:'5分',  v:5},
   {label:'10分', v:10},
   {label:'30分', v:30},
@@ -395,8 +442,8 @@ const STEPS = [
         <button class="btn pm plus"  aria-label="${s.label}すすめる">＋</button>
         <button class="btn pm minus" aria-label="${s.label}もどす">－</button>
       </div>`;
-    wrap.querySelector('.plus').addEventListener('click',()=>addMinutes(s.v));
-    wrap.querySelector('.minus').addEventListener('click',()=>addMinutes(-s.v));
+    wrap.querySelector('.plus').addEventListener('click',()=>{addMinutes(s.v);clearArcs();});
+    wrap.querySelector('.minus').addEventListener('click',()=>{addMinutes(-s.v);clearArcs();});
     box.appendChild(wrap);
   });
 })();
@@ -418,10 +465,10 @@ $('#setApply').addEventListener('click',()=>{
   let h = clampInt($('#setH').value,0,23,10);
   let m = clampInt($('#setM').value,0,59,0);
   state.total = h*60+m;
-  render(true);
+  render(true); clearArcs();
   $('#setpanel').classList.remove('open');
 });
-$('#resetBtn').addEventListener('click',()=>{ state.total=10*60+10; render(true); });
+$('#resetBtn').addEventListener('click',()=>{ state.total=10*60+10; render(true); clearArcs(); });
 
 function clampInt(v,min,max,def){
   let n = parseInt(v,10);
@@ -463,6 +510,122 @@ $('#calcAfter').addEventListener('click',()=>{
   lastResult = {base, res};
 });
 
+/* ========== 色おび（動いた分の可視化） ========== */
+const SVGNS='http://www.w3.org/2000/svg';
+const arcsG=$('#arcs');
+const CHUNK_COLORS={30:'#a855f7',10:'#ff9f1c',5:'#2ec4b6',1:'#ef476f'};
+function clearArcs(){ arcsG.innerHTML=''; }
+function polar(angleDeg,r){
+  const a=angleDeg*Math.PI/180;
+  return [200 + r*Math.sin(a), 200 - r*Math.cos(a)];
+}
+function drawArc(fromA,toA,color){
+  const r=104;
+  const [x1,y1]=polar(fromA,r), [x2,y2]=polar(toA,r);
+  const span=Math.abs(toA-fromA);
+  const large=span>180?1:0;
+  const sweep=toA>fromA?1:0;
+  const p=document.createElementNS(SVGNS,'path');
+  p.setAttribute('d',`M ${x1} ${y1} A ${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`);
+  p.setAttribute('fill','none');
+  p.setAttribute('stroke',color);
+  p.setAttribute('stroke-width','15');
+  p.setAttribute('stroke-linecap','round');
+  p.setAttribute('opacity','0.8');
+  arcsG.appendChild(p);
+}
+
+/* 絶対時刻セット（色おびもクリア） */
+function setClock(total,smooth=true){
+  state.total=((total%1440)+1440)%1440;
+  render(smooth); clearArcs();
+}
+
+/* 「この時こくにセット」（基準時刻を上の時計へ） */
+$('#baseSet').addEventListener('click',()=>{
+  const bh=clampInt($('#baseH').value,0,23,0);
+  const bm=clampInt($('#baseM').value,0,59,0);
+  setClock(bh*60+bm,true);
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* ========== ヒント（分解＋タップで色おび） ========== */
+function decompose(mins){
+  const denom=[30,10,5,1], parts=[]; let r=mins;
+  for(const d of denom){ while(r>=d){ parts.push(d); r-=d; } }
+  return parts;
+}
+let hintState=null;
+$('#hintBtn').addEventListener('click',()=>{
+  const bh=clampInt($('#baseH').value,0,23,0);
+  const bm=clampInt($('#baseM').value,0,59,0);
+  const d =clampInt($('#deltaMin').value,0,1440,0);
+  const dir=parseInt($('#dir').value,10);
+  if(d===0) return;
+  // 基準にセット
+  setClock(bh*60+bm,true);
+  const parts=decompose(d);
+  const word=dir>0?'あと':'まえ';
+  // 見出し：45分 = 30分 + 10分 + 5分
+  $('#hintTitle').innerHTML =
+    `${d}分${word} は…　<b>${parts.map(p=>p+'分').join(' ＋ ')}</b><br>`+
+    `<span class="hint">ボタンを じゅんばんに おしてみよう！針がうごくよ</span>`;
+  // チャンクボタン
+  const row=$('#chunkRow'); row.innerHTML='';
+  parts.forEach((p,i)=>{
+    const b=document.createElement('button');
+    b.className='btn chunk';
+    b.style.background=CHUNK_COLORS[p];
+    b.dataset.v=p;
+    b.innerHTML=`<span class="num">${p}</span>分`;
+    b.addEventListener('click',()=>{
+      if(b.classList.contains('used')) return;
+      const before=minRot;
+      addMinutes(dir*p);
+      drawArc(before, minRot, CHUNK_COLORS[p]);
+      b.classList.add('used');
+      window.scrollTo({top:0,behavior:'smooth'});
+      // 進んだ分チップ
+      const chip=document.createElement('span');
+      chip.className='pchip'; chip.style.background=CHUNK_COLORS[p];
+      chip.textContent=p+'分';
+      $('#progressChips').appendChild(chip);
+      // 実際におした分の合計（おす順番はどれでもOK）
+      const usedBtns=row.querySelectorAll('.chunk.used');
+      const sum=[...usedBtns].reduce((a,el)=>a+Number(el.dataset.v),0);
+      const used=usedBtns.length;
+      $('#progressTotal').textContent = '＝ '+sum+'分';
+      if(used===parts.length){
+        const h=Math.floor(state.total/60), m=state.total%60;
+        let msg=$('#progressTotal');
+        const done=document.createElement('div');
+        done.className='done-msg';
+        done.textContent=`🎉 こたえは ${h}時${String(m).padStart(2,'0')}分！`;
+        // 既存のdone-msgを消してから追加
+        const old=$('#hintBox').querySelector('.done-msg');
+        if(old) old.remove();
+        $('#progressChips').parentElement.appendChild(done);
+      }
+    });
+    row.appendChild(b);
+  });
+  $('#progressChips').innerHTML='';
+  $('#progressTotal').textContent='';
+  const old=$('#hintBox').querySelector('.done-msg'); if(old) old.remove();
+  $('#hintBox').classList.add('open');
+  hintState={bh,bm,d,dir,parts};
+});
+
+/* ヒントやりなおし */
+$('#hintReset').addEventListener('click',()=>{
+  if(!hintState) return;
+  setClock(hintState.bh*60+hintState.bm,true);
+  $('#chunkRow').querySelectorAll('.chunk.used').forEach(b=>b.classList.remove('used'));
+  $('#progressChips').innerHTML='';
+  $('#progressTotal').textContent='';
+  const old=$('#hintBox').querySelector('.done-msg'); if(old) old.remove();
+});
+
 /* 時計でうごかしてみる：基準にセット→少し待って結果へ */
 $('#showOnClock').addEventListener('click',()=>{
   const bh=clampInt($('#baseH').value,0,23,0);
@@ -470,7 +633,7 @@ $('#showOnClock').addEventListener('click',()=>{
   const d =clampInt($('#deltaMin').value,0,1440,0);
   const dir=parseInt($('#dir').value,10);
   // まず基準にセット（アニメなし）
-  state.total=bh*60+bm; render(false);
+  state.total=bh*60+bm; render(false); clearArcs();
   window.scrollTo({top:0,behavior:'smooth'});
   // 少しずつ動かす
   let remain=d;
