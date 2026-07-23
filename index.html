@@ -731,11 +731,12 @@ function judge(){
 }
 $('#judgeBtn').addEventListener('click',judge);
 
-/* ===== 難易度＆問題ランダム生成 ===== */
-const LV_UNIT    =[30,30,15,5,1];   // delta（すすむ分）の きざみ
+/* ===== 難易度＆問題ランダム生成 =====
+   レベル = もとの時こく（分）の きざみ（時計の読みやすさ）
+   だんかい① = delta が 1〜59分ランダム / ② = 1〜12時間＋0〜59分ランダム */
 const LV_BASEUNIT=[60,30,15,5,1];   // もとの時こく（分）の きざみ（Lv1=ちょうど＝00分）
 let currentLevel=1;
-let currentStage=1;   // 1=分だけ(1時間いない) / 2=時間と分(◯時間◯分)
+let currentStage=1;   // 1=分だけ(1時間いない) / 2=時間と分
 function randInt(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
 function formatDelta(mins){
   const h=Math.floor(mins/60), m=mins%60;
@@ -768,18 +769,15 @@ function generate(lv, st){
   setMode('quiz');
   setLevel(lv);
   setStage(st);
-  const unit=LV_UNIT[lv-1], bunit=LV_BASEUNIT[lv-1];
+  const bunit=LV_BASEUNIT[lv-1];
   const h0=randInt(1,12);
   const bmults=[]; for(let x=0;x<60;x+=bunit) bmults.push(x);
   const m0=bmults[randInt(0,bmults.length-1)];
-  const maxK=Math.floor(59/unit);            // きざみが 60未満に おさまる 最大回数
   let delta;
   if(st===1){
-    delta = unit*randInt(1,maxK);            // だんかい①：分だけ（1時間いない）
+    delta = randInt(1,59);                        // だんかい①：1〜59分ランダム
   }else{
-    const H=randInt(1,3);                    // だんかい②：◯時間◯分（分は0にしない）
-    const M=unit*randInt(1,maxK);
-    delta = H*60 + M;
+    delta = randInt(1,12)*60 + randInt(0,59);     // だんかい②：1〜12時間＋0〜59分ランダム
   }
   const dir=Math.random()<0.5?1:-1;
   $('#baseH').value=h0; $('#baseM').value=m0;
