@@ -218,7 +218,32 @@
   .lv small{font-size:.6rem;font-weight:700;color:#b3a992;margin-top:1px;}
   .lv.active{background:var(--accent2);color:#fff;border-color:var(--accent2);box-shadow:0 2px 0 #2f6fd0;}
   .lv.active small{color:#eaf2ff;}
+  .makebtn{
+    border:2px solid #ffd9a8;background:#fff;border-radius:12px;
+    padding:5px 11px;font-weight:800;font-size:1.1rem;font-family:inherit;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;line-height:1.05;color:#c47a1e;
+    box-shadow:0 2px 0 rgba(0,0,0,.06);transition:transform .05s;
+  }
+  .makebtn:active{transform:translateY(1px);}
+  .makebtn small{font-size:.6rem;font-weight:700;color:#d9a066;margin-top:1px;}
+  .makebtn.active{background:#f5972a;color:#fff;border-color:#f5972a;box-shadow:0 2px 0 #d67f18;}
+  .makebtn.active small{color:#ffe9cf;}
   .newq{background:var(--yellow);color:#7a5a00;padding:6px 12px;margin-left:auto;align-self:center;font-size:.98rem;}
+
+  /* じぶんでつくる パネル */
+  .makebox{
+    display:none;margin:0 0 12px;padding:14px 16px;border-radius:16px;
+    background:#fff7ee;border:2px solid #ffe0bd;
+  }
+  .mk-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .mk-row:last-child{margin-bottom:0;}
+  .mk-lbl{font-weight:800;color:#c47a1e;min-width:104px;font-size:1.02rem;}
+  .wheelwrap.sm{width:66px;height:132px;}
+  .wheel.sm{width:66px;height:132px;border-color:#ffd9a8;}
+  .wheel.sm .witem{font-size:1.4rem;}
+  .dirtoggle{display:inline-flex;border:2px solid #ffd9a8;border-radius:12px;overflow:hidden;}
+  .dirbtn{border:none;background:#fff;padding:9px 15px;font-weight:800;font-family:inherit;cursor:pointer;color:#6b6255;font-size:1.05rem;}
+  .dirbtn.active{background:#f5972a;color:#fff;}
   .question{
     font-size:1.55rem;font-weight:800;color:var(--ink);margin:4px 0 12px;
     background:#fff7e6;border:2px solid #ffe3ad;border-radius:14px;padding:14px 16px;line-height:1.4;
@@ -339,27 +364,42 @@
         <button class="lv" data-lv="3">3<small>15分</small></button>
         <button class="lv" data-lv="4">4<small>5分</small></button>
         <button class="lv" data-lv="5">5<small>1分</small></button>
+        <button class="makebtn" id="makeBtn">✏️<small>じぶん</small></button>
         <button class="btn newq" id="newQ">🎲 べつのもんだい</button>
       </div>
 
       <div class="question" id="questionText">…</div>
 
-      <div class="qline small-row">
-        <span class="lbl-small">じぶんでつくる：</span>
-        <span class="chip">
-          <input class="miniin" id="baseH" type="number" min="0" max="23" value="3" inputmode="numeric">時
-          <input class="miniin" id="baseM" type="number" min="0" max="59" value="20" inputmode="numeric">分
-        </span>
-        <button class="btn setmini" id="baseSet">⏰ 時計にセット</button>
-        <span class="chip">
-          <input class="miniin" id="deltaMin" type="number" min="0" max="1440" value="45" inputmode="numeric">分
-        </span>
-        <select class="dir" id="dir">
-          <option value="1">あと（後）は？</option>
-          <option value="-1">まえ（前）は？</option>
-        </select>
-        <button class="btn hintbtn" id="hintBtn">💡 ヒント</button>
+      <!-- じぶんでつくる（ホイールで えらぶ） -->
+      <div class="makebox" id="makeBox">
+        <div class="mk-row">
+          <span class="mk-lbl">🕐 いまの時こく</span>
+          <div class="wheelwrap sm"><div class="wheel sm" id="mkH"></div><div class="band"></div></div>
+          <span class="wsep">時</span>
+          <div class="wheelwrap sm"><div class="wheel sm" id="mkM"></div><div class="band"></div></div>
+          <span class="wsep">分</span>
+        </div>
+        <div class="mk-row">
+          <span class="mk-lbl">⏩ どれだけ</span>
+          <div class="wheelwrap sm"><div class="wheel sm" id="mkDH"></div><div class="band"></div></div>
+          <span class="wsep">時間</span>
+          <div class="wheelwrap sm"><div class="wheel sm" id="mkDM"></div><div class="band"></div></div>
+          <span class="wsep">分</span>
+          <div class="dirtoggle">
+            <button class="dirbtn active" data-d="1">あと</button>
+            <button class="dirbtn" data-d="-1">まえ</button>
+          </div>
+        </div>
       </div>
+
+      <!-- ヒント（いつでも 表示） -->
+      <div class="qline"><button class="btn hintbtn" id="hintBtn">💡 ヒント</button></div>
+
+      <!-- 値の いれもの（画面には ださない） -->
+      <input type="hidden" id="baseH" value="3">
+      <input type="hidden" id="baseM" value="20">
+      <input type="hidden" id="deltaMin" value="45">
+      <input type="hidden" id="dir" value="1">
 
       <!-- こたえは？ ホイールで入力 -->
       <div class="answerbox">
@@ -623,6 +663,11 @@ function setWheelVal(id,val){
 buildWheel('wheelH',[1,2,3,4,5,6,7,8,9,10,11,12]);
 buildWheel('wheelM',Array.from({length:60},(_,i)=>i));
 function resetWheels(){ setWheelVal('wheelH',12); setWheelVal('wheelM',0); }
+/* じぶんでつくる 用ホイール */
+buildWheel('mkH',[1,2,3,4,5,6,7,8,9,10,11,12]);
+buildWheel('mkM',Array.from({length:60},(_,i)=>i));
+buildWheel('mkDH',Array.from({length:13},(_,i)=>i)); // 0〜12時間
+buildWheel('mkDM',Array.from({length:60},(_,i)=>i)); // 0〜59分
 
 /* アナログ時計の見た目（1〜12時）に合わせた読み */
 function to12(total){
@@ -656,19 +701,30 @@ const LV_UNIT   =[60,30,15,5,1];   // レベル1〜5の きざみ（分）
 const LV_MAXSTEP=[2, 5, 8, 18, 110]; // delta = きざみ × 1..maxstep
 let currentLevel=1;
 function randInt(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function formatDelta(mins){
+  const h=Math.floor(mins/60), m=mins%60;
+  if(mins===0) return '';
+  if(h===0) return `${m}分`;
+  if(m===0) return `${h}時間`;
+  return `${h}時間${m}分`;
+}
 function refreshQuestion(){
   const bh=clampInt($('#baseH').value,0,23,0);
   const bm=clampInt($('#baseM').value,0,59,0);
   const d =clampInt($('#deltaMin').value,0,1440,0);
   const dir=parseInt($('#dir').value,10);
   const word=dir>0?'あと':'まえ';
-  $('#questionText').innerHTML=`<b>${bh}時${String(bm).padStart(2,'0')}分</b> の <b>${d}分${word}</b> は なんじ？`;
+  let h12=bh%12; if(h12===0) h12=12;
+  const base=`<b>${h12}時${String(bm).padStart(2,'0')}分</b>`;
+  if(d===0){ $('#questionText').innerHTML=`${base} …（どれだけ すすむか えらんでね）`; return; }
+  $('#questionText').innerHTML=`${base} の <b>${formatDelta(d)}${word}</b> は なんじ？`;
 }
 function setLevel(lv){
   currentLevel=lv;
   document.querySelectorAll('.lv').forEach(b=>b.classList.toggle('active',Number(b.dataset.lv)===lv));
 }
 function generate(lv){
+  setMode('quiz');
   setLevel(lv);
   const unit=LV_UNIT[lv-1];
   const h0=randInt(1,12);
@@ -690,10 +746,47 @@ document.querySelectorAll('.lv').forEach(b=>{
 });
 $('#newQ').addEventListener('click',()=>generate(currentLevel));
 
-/* 問題の条件を手で変えたら 判定を消して 問題文を更新 */
-['#baseH','#baseM','#deltaMin','#dir'].forEach(sel=>{
-  $(sel).addEventListener('input',()=>{ $('#result').innerHTML=''; refreshQuestion(); });
-  $(sel).addEventListener('change',()=>{ $('#result').innerHTML=''; refreshQuestion(); });
+/* ===== モード切替（レベル出題 ⇔ じぶんでつくる） ===== */
+function setMode(m){
+  const make=(m==='make');
+  $('#makeBox').style.display=make?'block':'none';
+  $('#newQ').style.display=make?'none':'inline-flex';
+  $('#makeBtn').classList.toggle('active',make);
+  if(make) document.querySelectorAll('.lv').forEach(b=>b.classList.remove('active'));
+}
+function setDir(v){
+  $('#dir').value=String(v);
+  document.querySelectorAll('.dirbtn').forEach(b=>b.classList.toggle('active',Number(b.dataset.d)===v));
+}
+function commitMake(){
+  const bh=wheelVal('mkH'), bm=wheelVal('mkM');
+  const dh=wheelVal('mkDH'), dm=wheelVal('mkDM');
+  $('#baseH').value=bh; $('#baseM').value=bm;
+  $('#deltaMin').value=dh*60+dm;
+  refreshQuestion();
+  setClock(bh*60+bm,true);
+  $('#result').innerHTML='';
+}
+function enterMake(){
+  setMode('make');
+  const bh=clampInt($('#baseH').value,0,23,0), bm=clampInt($('#baseM').value,0,59,0);
+  const d=clampInt($('#deltaMin').value,0,1440,0), dir=parseInt($('#dir').value,10);
+  let h12=bh%12; if(h12===0) h12=12;
+  setDir(dir);
+  $('#hintBox').classList.remove('open');
+  requestAnimationFrame(()=>{
+    setWheelVal('mkH',h12); setWheelVal('mkM',bm);
+    setWheelVal('mkDH',Math.min(12,Math.floor(d/60))); setWheelVal('mkDM',d%60);
+    commitMake();
+  });
+}
+$('#makeBtn').addEventListener('click',enterMake);
+document.querySelectorAll('.dirbtn').forEach(b=>{
+  b.addEventListener('click',()=>{ setDir(Number(b.dataset.d)); commitMake(); });
+});
+['mkH','mkM','mkDH','mkDM'].forEach(id=>{
+  const el=$('#'+id);
+  el.addEventListener('scroll',()=>{ clearTimeout(el._ct); el._ct=setTimeout(commitMake,90); });
 });
 
 /* ========== 色おび（動いた分の可視化） ========== */
@@ -726,14 +819,6 @@ function setClock(total,smooth=true){
   state.total=((total%1440)+1440)%1440;
   render(smooth); clearArcs();
 }
-
-/* 「この時こくにセット」（基準時刻を上の時計へ） */
-$('#baseSet').addEventListener('click',()=>{
-  const bh=clampInt($('#baseH').value,0,23,0);
-  const bm=clampInt($('#baseM').value,0,59,0);
-  setClock(bh*60+bm,true);
-  window.scrollTo({top:0,behavior:'smooth'});
-});
 
 /* ========== ヒント（分解＋タップで色おび） ========== */
 function decompose(mins){
