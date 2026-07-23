@@ -580,8 +580,8 @@ const STEPS = [
         <button class="btn pm plus"  aria-label="${s.label}すすめる">＋</button>
         <button class="btn pm minus" aria-label="${s.label}もどす">－</button>
       </div>`;
-    wrap.querySelector('.plus').addEventListener('click',()=>{addMinutes(s.v);clearArcs();});
-    wrap.querySelector('.minus').addEventListener('click',()=>{addMinutes(-s.v);clearArcs();});
+    wrap.querySelector('.plus').addEventListener('click',()=>{const b=minRot;addMinutes(s.v);drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999');});
+    wrap.querySelector('.minus').addEventListener('click',()=>{const b=minRot;addMinutes(-s.v);drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999');});
     box.appendChild(wrap);
   });
 })();
@@ -697,8 +697,9 @@ function judge(){
 $('#judgeBtn').addEventListener('click',judge);
 
 /* ===== 難易度＆問題ランダム生成 ===== */
-const LV_UNIT   =[60,30,15,5,1];   // レベル1〜5の きざみ（分）
-const LV_MAXSTEP=[2, 5, 8, 18, 110]; // delta = きざみ × 1..maxstep
+const LV_UNIT    =[60,30,15,5,1];   // delta（すすむ分）の きざみ
+const LV_BASEUNIT=[5, 30,15,5,1];   // もとの時こく（分）の きざみ ← レベル1でも 分をランダムに
+const LV_MAXSTEP =[3, 5, 8, 18,110]; // delta = きざみ × 1..maxstep
 let currentLevel=1;
 function randInt(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
 function formatDelta(mins){
@@ -726,9 +727,10 @@ function setLevel(lv){
 function generate(lv){
   setMode('quiz');
   setLevel(lv);
-  const unit=LV_UNIT[lv-1];
+  const unit=LV_UNIT[lv-1], bunit=LV_BASEUNIT[lv-1];
   const h0=randInt(1,12);
-  const mults=[]; for(let x=0;x<60;x+=unit) mults.push(x);
+  let mults=[]; for(let x=0;x<60;x+=bunit) mults.push(x);
+  if(lv===1) mults=mults.filter(x=>x!==0);   // 1時間問題は「ちょうど◯時」を避けて 分をランダムに
   const m0=mults[randInt(0,mults.length-1)];
   const delta=unit*randInt(1,LV_MAXSTEP[lv-1]);
   const dir=Math.random()<0.5?1:-1;
@@ -792,25 +794,38 @@ document.querySelectorAll('.dirbtn').forEach(b=>{
 /* ========== 色おび（動いた分の可視化） ========== */
 const SVGNS='http://www.w3.org/2000/svg';
 const arcsG=$('#arcs');
-const CHUNK_COLORS={30:'#a855f7',10:'#ff9f1c',5:'#2ec4b6',1:'#ef476f'};
-function clearArcs(){ arcsG.innerHTML=''; }
+const CHUNK_COLORS={60:'#ef476f',30:'#a855f7',10:'#ff9f1c',5:'#06d6a0',1:'#118ab2'};
+/* 帯は押すたびに 少しずつ 内側にずらす（かさならない・2時間3時間もリングで分かる） */
+const R_START=108, R_STEP=15, R_MIN=38;
+let arcR=R_START;
+function clearArcs(){ arcsG.innerHTML=''; arcR=R_START; }
+function nextR(){ const r=arcR; arcR=Math.max(R_MIN, arcR-R_STEP); return r; }
 function polar(angleDeg,r){
   const a=angleDeg*Math.PI/180;
   return [200 + r*Math.sin(a), 200 - r*Math.cos(a)];
 }
 function drawArc(fromA,toA,color){
-  const r=104;
-  const [x1,y1]=polar(fromA,r), [x2,y2]=polar(toA,r);
+  const r=nextR();
   const span=Math.abs(toA-fromA);
+  if(span>=359.5){
+    // 1時間ぶん＝ぐるっと1しゅう（まるい輪）
+    const c=document.createElementNS(SVGNS,'circle');
+    c.setAttribute('cx',200); c.setAttribute('cy',200); c.setAttribute('r',r);
+    c.setAttribute('fill','none'); c.setAttribute('stroke',color);
+    c.setAttribute('stroke-width','10'); c.setAttribute('opacity','0.85');
+    arcsG.appendChild(c);
+    return;
+  }
+  const [x1,y1]=polar(fromA,r), [x2,y2]=polar(toA,r);
   const large=span>180?1:0;
   const sweep=toA>fromA?1:0;
   const p=document.createElementNS(SVGNS,'path');
   p.setAttribute('d',`M ${x1} ${y1} A ${r} ${r} 0 ${large} ${sweep} ${x2} ${y2}`);
   p.setAttribute('fill','none');
   p.setAttribute('stroke',color);
-  p.setAttribute('stroke-width','15');
+  p.setAttribute('stroke-width','10');
   p.setAttribute('stroke-linecap','round');
-  p.setAttribute('opacity','0.8');
+  p.setAttribute('opacity','0.85');
   arcsG.appendChild(p);
 }
 
@@ -822,10 +837,11 @@ function setClock(total,smooth=true){
 
 /* ========== ヒント（分解＋タップで色おび） ========== */
 function decompose(mins){
-  const denom=[30,10,5,1], parts=[]; let r=mins;
+  const denom=[60,30,10,5,1], parts=[]; let r=mins;
   for(const d of denom){ while(r>=d){ parts.push(d); r-=d; } }
   return parts;
 }
+const chunkLabel = p => p===60 ? '1時間' : p+'分';
 let hintState=null;
 $('#hintBtn').addEventListener('click',()=>{
   const bh=clampInt($('#baseH').value,0,23,0);
@@ -839,7 +855,7 @@ $('#hintBtn').addEventListener('click',()=>{
   const word=dir>0?'あと':'まえ';
   // 見出し：45分 = 30分 + 10分 + 5分
   $('#hintTitle').innerHTML =
-    `${d}分${word} は…　<b>${parts.map(p=>p+'分').join(' ＋ ')}</b><br>`+
+    `${formatDelta(d)}${word} は…　<b>${parts.map(chunkLabel).join(' ＋ ')}</b><br>`+
     `<span class="hint">ボタンを じゅんばんに おしてみよう！針がうごくよ</span>`;
   // チャンクボタン
   const row=$('#chunkRow'); row.innerHTML='';
@@ -848,7 +864,7 @@ $('#hintBtn').addEventListener('click',()=>{
     b.className='btn chunk';
     b.style.background=CHUNK_COLORS[p];
     b.dataset.v=p;
-    b.innerHTML=`<span class="num">${p}</span>分`;
+    b.innerHTML = p===60 ? `<span class="num">1</span>時間` : `<span class="num">${p}</span>分`;
     b.addEventListener('click',()=>{
       if(b.classList.contains('used')) return;
       const before=minRot;
@@ -859,20 +875,20 @@ $('#hintBtn').addEventListener('click',()=>{
       // 進んだ分チップ
       const chip=document.createElement('span');
       chip.className='pchip'; chip.style.background=CHUNK_COLORS[p];
-      chip.textContent=p+'分';
+      chip.textContent=chunkLabel(p);
       $('#progressChips').appendChild(chip);
       // 実際におした分の合計（おす順番はどれでもOK）
       const usedBtns=row.querySelectorAll('.chunk.used');
       const sum=[...usedBtns].reduce((a,el)=>a+Number(el.dataset.v),0);
       const used=usedBtns.length;
-      $('#progressTotal').textContent = '＝ '+sum+'分';
+      $('#progressTotal').textContent = '＝ '+formatDelta(sum);
       if(used===parts.length){
         // 答えは出さない。時計を見て自分で「こたえは？」に入力してね
         const old=$('#hintBox').querySelector('.done-msg');
         if(old) old.remove();
         const done=document.createElement('div');
         done.className='done-msg';
-        done.textContent=`✨ ${sum}分 ぜんぶ うごかせたね！時計を見て こたえてみよう`;
+        done.textContent=`✨ ${formatDelta(sum)} ぜんぶ うごかせたね！時計を見て こたえてみよう`;
         $('#progressChips').parentElement.appendChild(done);
       }
     });
