@@ -205,6 +205,31 @@
     .steppers{margin-top:4px;}
   }
 
+  /* ===== 難易度バー＆問題文 ===== */
+  .levelbar{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;margin-bottom:10px;}
+  .lv-label{font-weight:800;color:#6b6255;align-self:center;margin-right:2px;}
+  .lv{
+    border:2px solid var(--line);background:#fff;border-radius:12px;
+    padding:5px 11px;font-weight:800;font-size:1.1rem;font-family:inherit;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;line-height:1.05;color:#6b6255;
+    box-shadow:0 2px 0 rgba(0,0,0,.06);transition:transform .05s;
+  }
+  .lv:active{transform:translateY(1px);}
+  .lv small{font-size:.6rem;font-weight:700;color:#b3a992;margin-top:1px;}
+  .lv.active{background:var(--accent2);color:#fff;border-color:var(--accent2);box-shadow:0 2px 0 #2f6fd0;}
+  .lv.active small{color:#eaf2ff;}
+  .newq{background:var(--yellow);color:#7a5a00;padding:6px 12px;margin-left:auto;align-self:center;font-size:.98rem;}
+  .question{
+    font-size:1.55rem;font-weight:800;color:var(--ink);margin:4px 0 12px;
+    background:#fff7e6;border:2px solid #ffe3ad;border-radius:14px;padding:14px 16px;line-height:1.4;
+  }
+  .question b{color:var(--accent);}
+  .small-row{font-size:.9rem;margin-bottom:4px;align-items:center;}
+  .lbl-small{color:#a99;font-weight:700;font-size:.82rem;}
+  .small-row .miniin{width:62px;font-size:1.1rem;}
+  .small-row select.dir{font-size:.95rem;padding:4px;}
+  .nextbtn{margin-left:14px;background:var(--accent2);vertical-align:middle;}
+
   /* ===== こたえは？ ホイール入力 ===== */
   .answerbox{
     margin-top:14px;padding:14px 16px;border-radius:16px;
@@ -307,15 +332,25 @@
 
     <!-- ◯分後・◯分前 -->
     <div class="panel active" id="panel-after">
-      <h2>いまが この時こくのとき…</h2>
-      <div class="qline">
+      <div class="levelbar" id="levelbar">
+        <span class="lv-label">レベル</span>
+        <button class="lv" data-lv="1">1<small>ちょうど</small></button>
+        <button class="lv" data-lv="2">2<small>30分</small></button>
+        <button class="lv" data-lv="3">3<small>15分</small></button>
+        <button class="lv" data-lv="4">4<small>5分</small></button>
+        <button class="lv" data-lv="5">5<small>1分</small></button>
+        <button class="btn newq" id="newQ">🎲 べつのもんだい</button>
+      </div>
+
+      <div class="question" id="questionText">…</div>
+
+      <div class="qline small-row">
+        <span class="lbl-small">じぶんでつくる：</span>
         <span class="chip">
           <input class="miniin" id="baseH" type="number" min="0" max="23" value="3" inputmode="numeric">時
           <input class="miniin" id="baseM" type="number" min="0" max="59" value="20" inputmode="numeric">分
         </span>
-        <button class="btn setmini" id="baseSet">⏰ この時こくにセット</button>
-      </div>
-      <div class="qline" style="margin-top:8px;">
+        <button class="btn setmini" id="baseSet">⏰ 時計にセット</button>
         <span class="chip">
           <input class="miniin" id="deltaMin" type="number" min="0" max="1440" value="45" inputmode="numeric">分
         </span>
@@ -324,7 +359,6 @@
           <option value="-1">まえ（前）は？</option>
         </select>
         <button class="btn hintbtn" id="hintBtn">💡 ヒント</button>
-        <button class="btn go" id="judgeTop">こたえる</button>
       </div>
 
       <!-- こたえは？ ホイールで入力 -->
@@ -559,30 +593,43 @@ function fmtTime(total){
 }
 /* ===== ホイール（くるくる数字えらび） ===== */
 const ROWH=44;
-function buildWheel(id,count){
+function buildWheel(id,values){
   const el=$('#'+id);
   el.innerHTML='<div class="wspacer"></div>';
-  for(let i=0;i<count;i++){
+  values.forEach((v,i)=>{
     const d=document.createElement('div');
-    d.className='witem'; d.textContent=i; d.dataset.i=i;
+    d.className='witem'; d.textContent=v; d.dataset.i=i;
     d.addEventListener('click',()=>el.scrollTo({top:i*ROWH,behavior:'smooth'}));
     el.appendChild(d);
-  }
+  });
   const sp=document.createElement('div'); sp.className='wspacer'; el.appendChild(sp);
+  el._values=values;
   const mark=()=>{
-    const idx=Math.round(el.scrollTop/ROWH);
+    const idx=Math.max(0,Math.min(values.length-1,Math.round(el.scrollTop/ROWH)));
     el.querySelectorAll('.witem').forEach(w=>w.classList.toggle('sel',Number(w.dataset.i)===idx));
   };
   el.addEventListener('scroll',()=>{ clearTimeout(el._t); el._t=setTimeout(mark,60); mark(); });
   mark();
 }
-function wheelVal(id,count){
-  const el=$('#'+id);
-  return Math.max(0,Math.min(count-1,Math.round(el.scrollTop/ROWH)));
+function wheelVal(id){
+  const el=$('#'+id), v=el._values;
+  const idx=Math.max(0,Math.min(v.length-1,Math.round(el.scrollTop/ROWH)));
+  return v[idx];
 }
-function setWheel(id,v){ $('#'+id).scrollTop=v*ROWH; }
-buildWheel('wheelH',24);
-buildWheel('wheelM',60);
+function setWheelVal(id,val){
+  const el=$('#'+id), idx=el._values.indexOf(val);
+  if(idx>=0) el.scrollTop=idx*ROWH;
+}
+buildWheel('wheelH',[1,2,3,4,5,6,7,8,9,10,11,12]);
+buildWheel('wheelM',Array.from({length:60},(_,i)=>i));
+function resetWheels(){ setWheelVal('wheelH',12); setWheelVal('wheelM',0); }
+
+/* アナログ時計の見た目（1〜12時）に合わせた読み */
+function to12(total){
+  let t=((total%720)+720)%720;
+  let h=Math.floor(t/60); if(h===0) h=12;
+  return {h, m:t%60};
+}
 
 /* ===== こたえあわせ（正誤判定） ===== */
 function judge(){
@@ -590,23 +637,63 @@ function judge(){
   const bm=clampInt($('#baseM').value,0,59,0);
   const d =clampInt($('#deltaMin').value,0,1440,0);
   const dir=parseInt($('#dir').value,10);
-  const r=fmtTime(bh*60+bm + dir*d);          // 正解（0〜23時 表記）
-  const ah=wheelVal('wheelH',24), am=wheelVal('wheelM',60);
+  const c=to12(bh*60+bm + dir*d);              // 正解（1〜12時 表記）
+  const ah=wheelVal('wheelH'), am=wheelVal('wheelM');
   const box=$('#result');
-  if(ah===r.h && am===r.m){
-    box.innerHTML=`<span class="card-msg ok">⭕ せいかい！すごい！<span class="sub">${r.h}時${String(r.m).padStart(2,'0')}分 だね 🎉</span></span>`;
+  if(ah===c.h && am===c.m){
+    box.innerHTML=`<span class="card-msg ok">⭕ せいかい！すごい！<span class="sub">${c.h}時${String(c.m).padStart(2,'0')}分 だね 🎉</span></span>`+
+                  `<button class="btn go big nextbtn" id="nextBtn">つぎのもんだい →</button>`;
+    $('#nextBtn').addEventListener('click',()=>generate(currentLevel));
   }else{
     box.innerHTML=`<span class="card-msg ng">❌ ちがうよ<span class="sub">もう いちど がんばって！</span></span>`;
   }
   box.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 $('#judgeBtn').addEventListener('click',judge);
-$('#judgeTop').addEventListener('click',judge);
 
-/* 問題の条件をいじったら 前の判定は消す */
+/* ===== 難易度＆問題ランダム生成 ===== */
+const LV_UNIT   =[60,30,15,5,1];   // レベル1〜5の きざみ（分）
+const LV_MAXSTEP=[2, 5, 8, 18, 110]; // delta = きざみ × 1..maxstep
+let currentLevel=1;
+function randInt(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function refreshQuestion(){
+  const bh=clampInt($('#baseH').value,0,23,0);
+  const bm=clampInt($('#baseM').value,0,59,0);
+  const d =clampInt($('#deltaMin').value,0,1440,0);
+  const dir=parseInt($('#dir').value,10);
+  const word=dir>0?'あと':'まえ';
+  $('#questionText').innerHTML=`<b>${bh}時${String(bm).padStart(2,'0')}分</b> の <b>${d}分${word}</b> は なんじ？`;
+}
+function setLevel(lv){
+  currentLevel=lv;
+  document.querySelectorAll('.lv').forEach(b=>b.classList.toggle('active',Number(b.dataset.lv)===lv));
+}
+function generate(lv){
+  setLevel(lv);
+  const unit=LV_UNIT[lv-1];
+  const h0=randInt(1,12);
+  const mults=[]; for(let x=0;x<60;x+=unit) mults.push(x);
+  const m0=mults[randInt(0,mults.length-1)];
+  const delta=unit*randInt(1,LV_MAXSTEP[lv-1]);
+  const dir=Math.random()<0.5?1:-1;
+  $('#baseH').value=h0; $('#baseM').value=m0;
+  $('#deltaMin').value=delta; $('#dir').value=String(dir);
+  refreshQuestion();
+  setClock(h0*60+m0,true);        // 時計を基準時こくにセット
+  resetWheels();
+  $('#result').innerHTML='';
+  $('#hintBox').classList.remove('open');   // ヒントは閉じる
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.lv').forEach(b=>{
+  b.addEventListener('click',()=>generate(Number(b.dataset.lv)));
+});
+$('#newQ').addEventListener('click',()=>generate(currentLevel));
+
+/* 問題の条件を手で変えたら 判定を消して 問題文を更新 */
 ['#baseH','#baseM','#deltaMin','#dir'].forEach(sel=>{
-  $(sel).addEventListener('input',()=>{ $('#result').innerHTML=''; });
-  $(sel).addEventListener('change',()=>{ $('#result').innerHTML=''; });
+  $(sel).addEventListener('input',()=>{ $('#result').innerHTML=''; refreshQuestion(); });
+  $(sel).addEventListener('change',()=>{ $('#result').innerHTML=''; refreshQuestion(); });
 });
 
 /* ========== 色おび（動いた分の可視化） ========== */
@@ -759,8 +846,9 @@ $('#calcMin').addEventListener('click',()=>{
   $('#ansMin').innerHTML=ans;
 });
 
-/* 初期描画 */
+/* 初期描画：レベルもランダムで さいしょの問題を出す */
 render(false);
+generate(randInt(1,5));
 </script>
 </body>
 </html>
