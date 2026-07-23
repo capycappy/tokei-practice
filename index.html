@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>とけいのれんしゅう</title>
+<style>
+  :root{
+    --bg:#fef9f0;
+    --card:#ffffff;
+    --ink:#3a3a3a;
+    --accent:#ff7a59;      /* 分針カラー（オレンジ） */
+    --accent2:#4d96ff;     /* 時針カラー（青） */
+    --green:#5cc98a;
+    --yellow:#ffd24d;
+    --line:#e7ddce;
+    --shadow:0 6px 18px rgba(0,0,0,.08);
+    font-size:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN",-apple-system,"Segoe UI",system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    padding:16px;
+    line-height:1.5;
+  }
+  h1{
+    text-align:center;
+    font-size:1.6rem;
+    margin:.2em 0 .6em;
+    letter-spacing:.05em;
+  }
+  h2{
+    font-size:1.15rem;
+    margin:.2em 0 .6em;
+    display:flex;align-items:center;gap:.4em;
+  }
+  .wrap{max-width:900px;margin:0 auto;}
+  .card{
+    background:var(--card);
+    border-radius:20px;
+    box-shadow:var(--shadow);
+    padding:18px;
+    margin-bottom:18px;
+  }
+  /* ===== 時計エリア ===== */
+  .clock-row{
+    display:flex;
+    gap:20px;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .clock-box{display:flex;flex-direction:column;align-items:center;gap:12px;}
+  svg.clock{
+    width:min(78vw,340px);
+    height:min(78vw,340px);
+    display:block;
+  }
+  .digital{
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    font-size:2.4rem;
+    letter-spacing:.04em;
+    background:#222;
+    color:#7dffb0;
+    padding:6px 18px;
+    border-radius:12px;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.5);
+    font-family:"DSEG7",Menlo,Consolas,monospace;
+  }
+  .digital.hidden{display:none;}
+  .ampm{font-size:1.1rem;color:var(--accent2);font-weight:700;}
+
+  /* ===== 針うごかしボタン ===== */
+  .steppers{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .stepper{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+  .stepper .lbl{
+    font-weight:700;
+    font-size:1.05rem;
+    background:var(--yellow);
+    color:#7a5a00;
+    border-radius:10px;
+    padding:2px 12px;
+  }
+  .pmwrap{display:flex;flex-direction:column;gap:6px;}
+  .btn{
+    border:none;
+    cursor:pointer;
+    font-family:inherit;
+    border-radius:14px;
+    font-weight:800;
+    transition:transform .05s ease, filter .1s ease;
+    box-shadow:0 3px 0 rgba(0,0,0,.12);
+  }
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.12);}
+  .pm{
+    width:58px;height:46px;
+    font-size:1.5rem;
+    color:#fff;
+  }
+  .plus{background:var(--green);}
+  .minus{background:var(--accent);}
+
+  /* ===== トグル・セット ===== */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:6px;}
+  .toggle{
+    display:inline-flex;align-items:center;gap:8px;
+    background:#f2ece0;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;
+    user-select:none;
+  }
+  .toggle input{width:20px;height:20px;accent-color:var(--accent2);}
+  .set-btn{
+    background:var(--accent2);color:#fff;padding:10px 16px;font-size:1rem;
+  }
+  .ghost{background:#efe8db;color:#6b6255;padding:10px 16px;font-size:1rem;}
+
+  /* ===== 時刻セット パネル ===== */
+  .setpanel{margin-top:12px;display:none;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;}
+  .setpanel.open{display:flex;}
+  .numin{
+    width:90px;font-size:1.6rem;text-align:center;font-weight:800;
+    border:3px solid var(--line);border-radius:12px;padding:6px;font-family:inherit;
+  }
+  .numin:focus{outline:none;border-color:var(--accent2);}
+  .sep{font-size:1.6rem;font-weight:800;}
+
+  /* ===== 計算れんしゅう ===== */
+  .calc-grid{display:grid;grid-template-columns:1fr;gap:12px;}
+  .qline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:1.1rem;font-weight:700;}
+  .chip{
+    display:inline-flex;gap:6px;align-items:center;background:#f2ece0;border-radius:12px;padding:4px 8px;
+  }
+  .miniin{
+    width:64px;font-size:1.3rem;text-align:center;font-weight:800;
+    border:3px solid var(--line);border-radius:10px;padding:4px;font-family:inherit;
+  }
+  .miniin:focus{outline:none;border-color:var(--accent2);}
+  select.dir{
+    font-size:1.1rem;font-weight:800;font-family:inherit;border:3px solid var(--line);
+    border-radius:10px;padding:6px;background:#fff;
+  }
+  .go{background:var(--green);color:#fff;padding:8px 18px;font-size:1.05rem;}
+  .answer{
+    margin-top:8px;font-size:1.4rem;font-weight:800;color:var(--accent2);
+    min-height:1.4em;
+  }
+  .answer .big{color:var(--accent);font-size:1.6rem;}
+  .hint{color:#8a8175;font-size:.9rem;font-weight:600;}
+  .tabbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .tab{
+    background:#efe8db;color:#6b6255;border:none;border-radius:12px 12px 0 0;
+    padding:8px 16px;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;
+  }
+  .tab.active{background:var(--card);color:var(--accent2);box-shadow:0 -3px 8px rgba(0,0,0,.05);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .foot{text-align:center;color:#b3a992;font-size:.8rem;margin:10px 0 30px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🕐 とけいのれんしゅう</h1>
+
+  <!-- ============ 時計カード ============ -->
+  <div class="card">
+    <div class="clock-row">
+      <!-- アナログ時計 -->
+      <div class="clock-box">
+        <svg class="clock" viewBox="0 0 400 400" aria-label="アナログどけい">
+          <circle cx="200" cy="200" r="196" fill="#fff" stroke="#e7ddce" stroke-width="6"/>
+          <circle cx="200" cy="200" r="188" fill="#fffdf8" stroke="#f2ece0" stroke-width="2"/>
+          <g id="ticks"></g>
+          <g id="numbers"></g>
+          <!-- 針 -->
+          <line id="hourHand"  x1="200" y1="200" x2="200" y2="118" stroke="var(--accent2)" stroke-width="12" stroke-linecap="round"/>
+          <line id="minHand"   x1="200" y1="200" x2="200" y2="60"  stroke="var(--accent)"  stroke-width="8"  stroke-linecap="round"/>
+          <circle cx="200" cy="200" r="12" fill="#333"/>
+          <circle cx="200" cy="200" r="5" fill="#fff"/>
+        </svg>
+        <!-- デジタル -->
+        <div id="digital" class="digital hidden"><span id="dampm" class="ampm">午前</span> <span id="dtime">10:10</span></div>
+      </div>
+
+      <!-- 針うごかしボタン -->
+      <div class="steppers" id="steppers">
+        <!-- JSで生成 -->
+      </div>
+    </div>
+
+    <!-- ツールバー -->
+    <div class="toolbar">
+      <label class="toggle"><input type="checkbox" id="digToggle"> デジタルもみる</label>
+      <button class="btn set-btn" id="setOpen">⏰ 時こくをセット</button>
+      <button class="btn ghost" id="resetBtn">10:10にもどす</button>
+    </div>
+
+    <!-- 時刻セットパネル -->
+    <div class="setpanel" id="setpanel">
+      <input class="numin" id="setH" type="number" min="0" max="23" value="10" inputmode="numeric">
+      <span class="sep">時</span>
+      <input class="numin" id="setM" type="number" min="0" max="59" value="10" inputmode="numeric">
+      <span class="sep">分</span>
+      <button class="btn set-btn" id="setApply">セット</button>
+    </div>
+  </div>
+
+  <!-- ============ 計算れんしゅうカード ============ -->
+  <div class="card">
+    <div class="tabbar">
+      <button class="tab active" data-tab="after">⏩ ◯分あと・◯分まえ</button>
+      <button class="tab" data-tab="unit">📅 じかんを 日にちに</button>
+    </div>
+
+    <!-- ◯分後・◯分前 -->
+    <div class="panel active" id="panel-after">
+      <h2>いまが この時こくのとき…</h2>
+      <div class="qline">
+        <span class="chip">
+          <input class="miniin" id="baseH" type="number" min="0" max="23" value="3" inputmode="numeric">時
+          <input class="miniin" id="baseM" type="number" min="0" max="59" value="20" inputmode="numeric">分
+        </span>
+        の
+        <span class="chip">
+          <input class="miniin" id="deltaMin" type="number" min="0" max="1440" value="45" inputmode="numeric">分
+        </span>
+        <select class="dir" id="dir">
+          <option value="1">あと（後）は？</option>
+          <option value="-1">まえ（前）は？</option>
+        </select>
+        <button class="btn go" id="calcAfter">こたえる</button>
+      </div>
+      <div class="answer" id="ansAfter"></div>
+      <div class="qline" style="margin-top:6px;">
+        <button class="btn ghost" id="showOnClock">🕐 上の時計でうごかしてみる</button>
+        <span class="hint">まず基準の時こくにセットしてから、ゆっくり針がうごきます</span>
+      </div>
+    </div>
+
+    <!-- 時間→日にち -->
+    <div class="panel" id="panel-unit">
+      <h2>ながい じかんを 日にちに なおそう</h2>
+      <div class="qline">
+        <span class="chip"><input class="miniin" id="unitHours" type="number" min="0" value="50" inputmode="numeric">時間</span>
+        は？
+        <button class="btn go" id="calcUnit">こたえる</button>
+      </div>
+      <div class="answer" id="ansUnit"></div>
+      <div class="qline" style="margin-top:10px;">
+        <span class="chip"><input class="miniin" id="unitMinutes" type="number" min="0" value="150" inputmode="numeric">分</span>
+        は？
+        <button class="btn go" id="calcMin">こたえる</button>
+      </div>
+      <div class="answer" id="ansMin"></div>
+    </div>
+  </div>
+
+  <div class="foot">つくった時計はブラウザだけで うごきます · インターネットがなくても OK</div>
+</div>
+
+<script>
+/* =========================================================
+   状態：totalMinutes = 0〜1439 (0:00〜23:59)
+   針の回転は「連続角度」で管理して、ぐるっと戻らないようにする
+========================================================= */
+const state = { total: 10*60+10 };   // 10:10 スタート
+let minRot = 0;   // 分針の連続回転（度）
+let hourRot = 0;  // 時針の連続回転（度）
+
+const $ = s => document.querySelector(s);
+const minHand = $('#minHand');
+const hourHand = $('#hourHand');
+const digital = $('#digital');
+const dtime = $('#dtime');
+const dampm = $('#dampm');
+
+/* 文字盤の数字とメモリを描く */
+(function buildFace(){
+  const nums = $('#numbers');
+  const ticks = $('#ticks');
+  const cx=200, cy=200;
+  for(let i=0;i<60;i++){
+    const ang = i*6 * Math.PI/180;
+    const big = i%5===0;
+    const r1 = big?176:182;
+    const r2 = 188;
+    const x1 = cx + r1*Math.sin(ang), y1 = cy - r1*Math.cos(ang);
+    const x2 = cx + r2*Math.sin(ang), y2 = cy - r2*Math.cos(ang);
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',x1);l.setAttribute('y1',y1);
+    l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+    l.setAttribute('stroke', big?'#4d96ff':'#d8cdb9');
+    l.setAttribute('stroke-width', big?4:2);
+    l.setAttribute('stroke-linecap','round');
+    ticks.appendChild(l);
+  }
+  for(let n=1;n<=12;n++){
+    const ang = n*30 * Math.PI/180;
+    const r=150;
+    const x = cx + r*Math.sin(ang), y = cy - r*Math.cos(ang);
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x);t.setAttribute('y',y);
+    t.setAttribute('text-anchor','middle');
+    t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-size','34');
+    t.setAttribute('font-weight','800');
+    t.setAttribute('fill','#3a3a3a');
+    t.textContent = n;
+    nums.appendChild(t);
+    // 5分ごとの分の数字（小さく・赤）
+    const rm=120;
+    const xm = cx + rm*Math.sin(ang), ym = cy - rm*Math.cos(ang);
+    const tm = document.createElementNS('http://www.w3.org/2000/svg','text');
+    tm.setAttribute('x',xm);tm.setAttribute('y',ym);
+    tm.setAttribute('text-anchor','middle');
+    tm.setAttribute('dominant-baseline','central');
+    tm.setAttribute('font-size','15');
+    tm.setAttribute('font-weight','700');
+    tm.setAttribute('fill','#ff7a59');
+    tm.textContent = (n*5)%60;
+    nums.appendChild(tm);
+  }
+})();
+
+/* 針をなめらかに動かす（連続角度を目標に合わせる） */
+function nearestCongruent(current, target){
+  let diff = ((target - current) % 360 + 540) % 360 - 180;
+  return current + diff;
+}
+function render(smooth=true){
+  const h = Math.floor(state.total/60);
+  const m = state.total%60;
+  const targetMin = m*6;
+  const targetHour = (h%12)*30 + m*0.5;
+  minRot = nearestCongruent(minRot, targetMin);
+  hourRot = nearestCongruent(hourRot, targetHour);
+  const trans = smooth ? 'transform .55s cubic-bezier(.34,1.3,.5,1)' : 'none';
+  minHand.style.transition = trans;
+  hourHand.style.transition = trans;
+  minHand.style.transform = `rotate(${minRot}deg)`;
+  minHand.style.transformOrigin = '200px 200px';
+  hourHand.style.transform = `rotate(${hourRot}deg)`;
+  hourHand.style.transformOrigin = '200px 200px';
+
+  // デジタル
+  const ampm = h<12 ? '午前' : '午後';
+  let h12 = h%12; if(h12===0) h12=12;
+  dampm.textContent = ampm;
+  dtime.textContent = `${String(h12)}:${String(m).padStart(2,'0')}`;
+}
+
+/* 分を足し引き（0〜1439でループ） */
+function addMinutes(delta){
+  state.total = ((state.total + delta) % 1440 + 1440) % 1440;
+  // 連続回転も同じだけ動かす（ループさせない＝ぐるぐる感が出る）
+  minRot += delta*6;
+  hourRot += delta*0.5;
+  const trans = 'transform .55s cubic-bezier(.34,1.3,.5,1)';
+  minHand.style.transition = trans; hourHand.style.transition = trans;
+  minHand.style.transform = `rotate(${minRot}deg)`;
+  hourHand.style.transform = `rotate(${hourRot}deg)`;
+  const h = Math.floor(state.total/60), m = state.total%60;
+  const ampm = h<12?'午前':'午後'; let h12=h%12; if(h12===0)h12=12;
+  dampm.textContent = ampm;
+  dtime.textContent = `${h12}:${String(m).padStart(2,'0')}`;
+}
+
+/* 針うごかしボタンを作る（5・10・30分＋1時間、＋／－を縦に） */
+const STEPS = [
+  {label:'5分',  v:5},
+  {label:'10分', v:10},
+  {label:'30分', v:30},
+  {label:'1時間',v:60},
+];
+(function buildSteppers(){
+  const box = $('#steppers');
+  STEPS.forEach(s=>{
+    const wrap = document.createElement('div');
+    wrap.className='stepper';
+    wrap.innerHTML = `
+      <span class="lbl">${s.label}</span>
+      <div class="pmwrap">
+        <button class="btn pm plus"  aria-label="${s.label}すすめる">＋</button>
+        <button class="btn pm minus" aria-label="${s.label}もどす">－</button>
+      </div>`;
+    wrap.querySelector('.plus').addEventListener('click',()=>addMinutes(s.v));
+    wrap.querySelector('.minus').addEventListener('click',()=>addMinutes(-s.v));
+    box.appendChild(wrap);
+  });
+})();
+
+/* デジタル ON/OFF */
+$('#digToggle').addEventListener('change',e=>{
+  digital.classList.toggle('hidden', !e.target.checked);
+});
+
+/* 時刻セット */
+$('#setOpen').addEventListener('click',()=>{
+  const p=$('#setpanel'); p.classList.toggle('open');
+  if(p.classList.contains('open')){
+    $('#setH').value = Math.floor(state.total/60);
+    $('#setM').value = state.total%60;
+  }
+});
+$('#setApply').addEventListener('click',()=>{
+  let h = clampInt($('#setH').value,0,23,10);
+  let m = clampInt($('#setM').value,0,59,0);
+  state.total = h*60+m;
+  render(true);
+  $('#setpanel').classList.remove('open');
+});
+$('#resetBtn').addEventListener('click',()=>{ state.total=10*60+10; render(true); });
+
+function clampInt(v,min,max,def){
+  let n = parseInt(v,10);
+  if(isNaN(n)) n=def;
+  return Math.max(min,Math.min(max,n));
+}
+
+/* ========== タブ ========== */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('#panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ========== ◯分後・◯分前 ========== */
+function fmtTime(total){
+  total = ((total%1440)+1440)%1440;
+  const h=Math.floor(total/60), m=total%60;
+  const ampm = h<12?'午前':'午後'; let h12=h%12; if(h12===0)h12=12;
+  return {text:`${h}時${String(m).padStart(2,'0')}分`, nice:`${ampm} ${h12}:${String(m).padStart(2,'0')}`, h, m, total};
+}
+let lastResult = null;
+$('#calcAfter').addEventListener('click',()=>{
+  const bh=clampInt($('#baseH').value,0,23,0);
+  const bm=clampInt($('#baseM').value,0,59,0);
+  const d =clampInt($('#deltaMin').value,0,1440,0);
+  const dir=parseInt($('#dir').value,10);
+  const base=bh*60+bm;
+  const res=base + dir*d;
+  const r=fmtTime(res);
+  const word = dir>0?'あと':'まえ';
+  let dayNote='';
+  if(res>=1440) dayNote=' <span class="hint">（つぎの日）</span>';
+  if(res<0)     dayNote=' <span class="hint">（まえの日）</span>';
+  $('#ansAfter').innerHTML = `${bh}時${String(bm).padStart(2,'0')}分 の ${d}分${word} は …　<span class="big">${r.text}</span>${dayNote}`;
+  lastResult = {base, res};
+});
+
+/* 時計でうごかしてみる：基準にセット→少し待って結果へ */
+$('#showOnClock').addEventListener('click',()=>{
+  const bh=clampInt($('#baseH').value,0,23,0);
+  const bm=clampInt($('#baseM').value,0,59,0);
+  const d =clampInt($('#deltaMin').value,0,1440,0);
+  const dir=parseInt($('#dir').value,10);
+  // まず基準にセット（アニメなし）
+  state.total=bh*60+bm; render(false);
+  window.scrollTo({top:0,behavior:'smooth'});
+  // 少しずつ動かす
+  let remain=d;
+  const stepSize = d>180? 30 : (d>60?10:5);
+  const timer=setInterval(()=>{
+    const step=Math.min(stepSize,remain);
+    addMinutes(dir*step);
+    remain-=step;
+    if(remain<=0) clearInterval(timer);
+  },650);
+});
+
+/* ========== 時間→日にち／分→時間 ========== */
+$('#calcUnit').addEventListener('click',()=>{
+  const H=clampInt($('#unitHours').value,0,1000000,0);
+  const days=Math.floor(H/24), hrs=H%24;
+  let ans=`${H}時間 は …　<span class="big">${days}日 と ${hrs}時間</span>`;
+  if(days===0) ans=`${H}時間 は …　<span class="big">${hrs}時間</span> <span class="hint">（1日にならないよ）</span>`;
+  $('#ansUnit').innerHTML=ans;
+});
+$('#calcMin').addEventListener('click',()=>{
+  const M=clampInt($('#unitMinutes').value,0,1000000,0);
+  const hrs=Math.floor(M/60), min=M%60;
+  let ans=`${M}分 は …　<span class="big">${hrs}時間 ${min}分</span>`;
+  if(hrs===0) ans=`${M}分 は …　<span class="big">${min}分</span> <span class="hint">（1時間にならないよ）</span>`;
+  $('#ansMin').innerHTML=ans;
+});
+
+/* 初期描画 */
+render(false);
+</script>
+</body>
+</html>
