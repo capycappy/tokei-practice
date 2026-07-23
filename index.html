@@ -582,14 +582,19 @@ const STEPS = [
         <button class="btn pm minus" aria-label="${s.label}もどす">－</button>
       </div>`;
     wrap.querySelector('.plus').addEventListener('click',()=>{
-      const b=minRot; addMinutes(s.v); drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999',s.v);
+      const top=arcStack[arcStack.length-1];
+      if(top && top.v===s.v && top.d===-1){   // 直前が同じ大きさの「－」→ 取り消し（帯を消す）
+        addMinutes(s.v); popArc();
+      }else{                                  // それ以外 → 前むきの帯をつける
+        const b=minRot; addMinutes(s.v); drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999',s.v,1);
+      }
     });
     wrap.querySelector('.minus').addEventListener('click',()=>{
       const top=arcStack[arcStack.length-1];
-      if(top && top.v===s.v){           // 直前が同じ大きさの帯 → もとにもどす（帯を消す）
+      if(top && top.v===s.v && top.d===1){    // 直前が同じ大きさの「＋」→ 取り消し（帯を消す）
         addMinutes(-s.v); popArc();
-      }else{                            // それ以外 → 逆むきの帯をつける
-        const b=minRot; addMinutes(-s.v); drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999',s.v);
+      }else{                                  // それ以外 → 逆むきの帯をつける
+        const b=minRot; addMinutes(-s.v); drawArc(b,minRot,CHUNK_COLORS[s.v]||'#999',s.v,-1);
       }
     });
     box.appendChild(wrap);
@@ -837,12 +842,12 @@ function makeArc(fromA,toA,color,r){
   el.setAttribute('stroke-width','10'); el.setAttribute('opacity','0.85');
   return el;
 }
-/* 帯を積む（v = 大きさ。あとで「－」の判定に使う） */
-function drawArc(fromA,toA,color,v){
+/* 帯を積む（v = 大きさ、d = 向き +1/-1。あとで取り消し判定に使う） */
+function drawArc(fromA,toA,color,v,d=1){
   const r=nextR();
   const el=makeArc(fromA,toA,color,r);
   arcsG.appendChild(el);
-  arcStack.push({v, el, r});
+  arcStack.push({v, el, r, d});
 }
 /* 直前の帯を消す（もとにもどす） */
 function popArc(){
@@ -893,7 +898,7 @@ $('#hintBtn').addEventListener('click',()=>{
       if(b.classList.contains('used')) return;
       const before=minRot;
       addMinutes(dir*p);
-      drawArc(before, minRot, CHUNK_COLORS[p], p);
+      drawArc(before, minRot, CHUNK_COLORS[p], p, dir>0?1:-1);
       b.classList.add('used');
       window.scrollTo({top:0,behavior:'smooth'});
       // 進んだ分チップ
